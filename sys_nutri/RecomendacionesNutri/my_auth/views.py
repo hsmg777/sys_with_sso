@@ -1,33 +1,42 @@
-from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from .serializers import UsuarioSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
-from .models import Usuario
+from my_auth.models import Usuario
+from my_auth.keycloak import require_token
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-class UserProfileView(APIView):
-    permission_classes = [IsAuthenticated]
 
+class UserProfileView(APIView):
+    """
+    Vista protegida por Keycloak para obtener o actualizar el perfil del usuario autenticado.
+    """
+
+    @require_token
     def get(self, request):
-        """
-        Obtener el perfil del usuario autenticado.
-        """
-        serializer = UsuarioSerializer(request.user)
+        email = request.keycloak_user.get("email")
+        try:
+            usuario = Usuario.objects.get(email=email)
+        except Usuario.DoesNotExist:
+            return Response({"error": "Usuario no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UsuarioSerializer(usuario)
         return Response(serializer.data)
-    
+
+    @require_token
     def put(self, request):
-        """
-        Actualiza los datos del perfil del usuario autenticado.
-        """
-        usuario = request.user
+        email = request.keycloak_user.get("email")
+        try:
+            usuario = Usuario.objects.get(email=email)
+        except Usuario.DoesNotExist:
+            return Response({"error": "Usuario no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = UsuarioSerializer(usuario, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -39,13 +48,13 @@ class RegistroUsuarioView(APIView):
             type=openapi.TYPE_OBJECT,
             required=["username", "email", "password", "nombres", "apellidos", "altura", "peso"],
             properties={
-                "username": openapi.Schema(type=openapi.TYPE_STRING, description="Nombre de usuario único."),
-                "email": openapi.Schema(type=openapi.TYPE_STRING, description="Correo electrónico único."),
-                "password": openapi.Schema(type=openapi.TYPE_STRING, description="Contraseña del usuario."),
-                "nombres": openapi.Schema(type=openapi.TYPE_STRING, description="Nombres del usuario."),
-                "apellidos": openapi.Schema(type=openapi.TYPE_STRING, description="Apellidos del usuario."),
-                "altura": openapi.Schema(type=openapi.TYPE_NUMBER, description="Altura en metros."),
-                "peso": openapi.Schema(type=openapi.TYPE_NUMBER, description="Peso en kilogramos."),
+                "username": openapi.Schema(type=openapi.TYPE_STRING),
+                "email": openapi.Schema(type=openapi.TYPE_STRING),
+                "password": openapi.Schema(type=openapi.TYPE_STRING),
+                "nombres": openapi.Schema(type=openapi.TYPE_STRING),
+                "apellidos": openapi.Schema(type=openapi.TYPE_STRING),
+                "altura": openapi.Schema(type=openapi.TYPE_NUMBER),
+                "peso": openapi.Schema(type=openapi.TYPE_NUMBER),
                 "preferencias_ids": openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     items=openapi.Items(type=openapi.TYPE_INTEGER),
@@ -60,17 +69,7 @@ class RegistroUsuarioView(APIView):
     )
     def post(self, request):
         """
-        Registro de usuario. Este servicio espera un JSON con los siguientes datos:
-        {
-            "username": "string",
-            "email": "string",
-            "password": "string",
-            "nombres": "string",
-            "apellidos": "string",
-            "altura": float,
-            "peso": float,
-            "preferencias_ids": [int, int, ...]
-        }
+        ⚠️ Registro local (útil solo si se usa en conjunto con Keycloak).
         """
         serializer = UsuarioSerializer(data=request.data)
         if serializer.is_valid():
@@ -82,71 +81,25 @@ class RegistroUsuarioView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class LoginView(APIView):
-    permission_classes = [AllowAny]
-
-    @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=["email", "password"],
-            properties={
-                "email": openapi.Schema(type=openapi.TYPE_STRING, description="Correo electrónico del usuario."),
-                "password": openapi.Schema(type=openapi.TYPE_STRING, description="Contraseña del usuario."),
-            },
-        ),
-        responses={
-            200: openapi.Response("Tokens de autenticación generados."),
-            401: openapi.Response("Credenciales inválidas."),
-        },
-    )
-    def post(self, request):
-        """
-        Inicio de sesión del usuario. Este servicio espera un JSON con los siguientes datos:
-        {
-            "email": "string",
-            "password": "string"
-        }
-        """
-        email = request.data.get('email')
-        password = request.data.get('password')
-
-        # Validar que se envían ambos campos
-        if not email or not password:
-            return Response(
-                {"mensaje": "Debe proporcionar un correo y una contraseña."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Buscar usuario por correo electrónico
-            user = Usuario.objects.get(email=email)
-        except Usuario.DoesNotExist:
-            return Response({"mensaje": "Credenciales inválidas."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Verificar contraseña
-        if user.check_password(password):
-            refresh = RefreshToken.for_user(user)
-            return Response(
-                {
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token),
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        return Response({"mensaje": "Credenciales inválidas."}, status=status.HTTP_401_UNAUTHORIZED)
-    
 class MisMacronutrientesView(APIView):
     """
-    Vista para obtener las necesidades de macronutrientes del usuario actual,
-    incluyendo los valores máximos y mínimos.
+    Vista protegida por Keycloak para obtener las necesidades de macronutrientes
+    del usuario actual, incluyendo los valores máximos y mínimos.
     """
-    permission_classes = [IsAuthenticated]
 
+    @require_token
     def get(self, request):
-        usuario = request.user  # Usuario autenticado
+        keycloak_user = request.keycloak_user
+        email = keycloak_user.get("email")
 
-        # Validar si el usuario tiene peso para calcular
+        try:
+            usuario = Usuario.objects.get(email=email)
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no registrado localmente."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         if not usuario.peso:
             return Response(
                 {"error": "Es necesario tener un peso registrado para calcular macronutrientes."},
@@ -160,7 +113,6 @@ class MisMacronutrientesView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Obtener mínimos y máximos desde el modelo
         minimos = usuario.get_minimos()
         maximos = usuario.get_maximos()
 

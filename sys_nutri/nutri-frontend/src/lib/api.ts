@@ -1,25 +1,40 @@
 import { ENDPOINTS } from './apiEndpoints';
 
-export async function registerUser(data: any) {
-  const response = await fetch(ENDPOINTS.AUTH.REGISTER, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) throw new Error('Error al registrarse.');
-  return response.json();
-}
+/* ──────────────── 🔐 KEYCLOAK AUTH ──────────────── */
 
-export async function login(data: any) {
-  const response = await fetch(ENDPOINTS.AUTH.LOGIN, {
+// Login usando grant_type = password
+export async function login(data: { username: string; password: string }) {
+  const response = await fetch('http://localhost:8080/realms/MultiAppRealm/protocol/openid-connect/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'password',
+      client_id: 'frontend-nutri-client',
+      username: data.username,
+      password: data.password,
+    }),
   });
+
   if (!response.ok) throw new Error('Error al iniciar sesión.');
-  return response.json();
+  return await response.json();
 }
 
+
+// Guardar token localmente
+export function saveToken(token: string) {
+  localStorage.setItem('keycloak_token', token);
+}
+
+// Obtener token guardado
+export function getToken(): string | null {
+  // Leer desde localStorage (token compartido)
+  return localStorage.getItem("access_token");
+}
+
+
+/* ──────────────── 👤 USUARIO ──────────────── */
+
+// Obtener perfil del usuario autenticado
 export async function getUserData(token: string) {
   const response = await fetch(ENDPOINTS.AUTH.USER, {
     method: 'GET',
@@ -28,13 +43,13 @@ export async function getUserData(token: string) {
       'Content-Type': 'application/json',
     },
   });
-  if (!response.ok) {
-    throw new Error('No se pudieron cargar los datos del usuario');
-  }
-  return response.json();
+
+  if (!response.ok) throw new Error('No se pudieron cargar los datos del usuario');
+  return await response.json();
 }
 
-export const updateUserData = async (token: string, data: any) => {
+// Actualizar perfil del usuario autenticado
+export async function updateUserData(token: string, data: any) {
   const response = await fetch(ENDPOINTS.AUTH.USER, {
     method: 'PUT',
     headers: {
@@ -44,9 +59,23 @@ export const updateUserData = async (token: string, data: any) => {
     body: JSON.stringify(data),
   });
 
+  if (!response.ok) throw new Error('Error al actualizar los datos');
+  return await response.json();
+}
+
+
+// 🆕 Registro de usuario (usado en RegisterPage)
+export async function registerUser(data: any) {
+  const response = await fetch('http://localhost:8000/api/auth/register/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
   if (!response.ok) {
-    throw new Error('Error al actualizar los datos');
+    const errorText = await response.text();
+    throw new Error(`Error al registrar usuario: ${errorText}`);
   }
 
   return await response.json();
-};
+}

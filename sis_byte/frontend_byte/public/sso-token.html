@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SSO Token Bridge</title>
+</head>
+<body>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const token = localStorage.getItem("access_token");
+      const refresh = localStorage.getItem("refresh_token");
+      const expires = localStorage.getItem("token_expires_at");
+
+      console.log("📤 Enviando token desde sso-token.html");
+      window.opener?.postMessage(
+        {
+          type: "KC_SSO_TOKEN",
+          token,
+          refresh,
+          expires,
+        },
+        "http://localhost:3000" // 👈 Usa el origen real de sysnutri
+      );
+
+      window.close(); // Esto debería cerrar la ventana
+    });
+  </script>
+</body>
+</html>
