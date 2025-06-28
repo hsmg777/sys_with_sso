@@ -1,0 +1,118 @@
+version: "3.9"
+
+services:
+
+  # === KEYCLOAK ===
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    networks:
+      - sso-net
+
+  # === SYS_BYTE ===
+  flask_backend_sso:
+    build: ./sis_byte/backend_byte
+    container_name: flask_backend_sso
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./sis_byte/backend_byte:/app
+    env_file:
+      - ./sis_byte/backend_byte/.env
+    environment:
+      - FLASK_APP=app:create_app
+      - FLASK_DEBUG=1
+    depends_on:
+      - mysql_db_sso
+    networks:
+      - sso-net
+
+  mysql_db_sso:
+    image: mysql:8.0
+    container_name: mysql_db_sso
+    ports:
+      - "3306:3306"
+    restart: always
+    environment:
+      MYSQL_DATABASE: sys_byte
+      MYSQL_ROOT_PASSWORD: hsmg777
+      MYSQL_USER: hsmg
+      MYSQL_PASSWORD: hsmg777
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - sso-net
+
+  react_frontend_sso:
+    build: ./sis_byte/frontend_byte
+    container_name: react_frontend_sso
+    ports:
+      - "5173:5173"
+    working_dir: /app
+    volumes:
+      - ./sis_byte/frontend_byte:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      - sso-net
+
+  # === SYS_NUTRI ===
+  nutri-backend:
+    build: ./sys_nutri/RecomendacionesNutri
+    container_name: nutri-backend
+    volumes:
+      - ./sys_nutri/RecomendacionesNutri:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - ALLOWED_HOSTS=*
+      - DB_HOST=nutri-db
+      - DB_NAME=RecomendacionesNutriDB
+      - DB_USER=postgres
+      - DB_PASSWORD=familia4
+    depends_on:
+      - nutri-db
+    networks:
+      - sso-net
+
+  nutri-frontend:
+    build: ./sys_nutri/nutri-frontend
+    container_name: nutri-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    networks:
+      - sso-net
+
+  nutri-db:
+    image: postgres:13
+    container_name: nutri-db
+    restart: always
+    environment:
+      POSTGRES_DB: RecomendacionesNutriDB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: familia4
+    volumes:
+      - nutri_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - sso-net
+
+# Volúmenes
+volumes:
+  mysql_data:
+  nutri_postgres_data:
+
+# Red compartida
+networks:
+  sso-net:
+    driver: bridge
