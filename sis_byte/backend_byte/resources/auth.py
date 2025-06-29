@@ -1,9 +1,16 @@
 from flask_smorest import Blueprint
 from flask.views import MethodView
 from flask import request, g
+import qrcode
 from utils.keycloak import require_token, create_keycloak_user
 import requests
 import os
+import pyotp
+import base64
+from qrcode.image.pil import PilImage
+
+
+
 
 blp = Blueprint("Auth", __name__, description="Operaciones de autenticación")
 
@@ -86,3 +93,57 @@ class Login(MethodView):
 
         except Exception as e:
             return {"error": str(e)}, 500
+        
+from utils.totp_manager import (
+    generate_totp_secret_for_user,
+    verify_totp
+)
+from flask import jsonify
+from io import BytesIO
+
+@blp.route("/setup-2fa/<username>")
+class Setup2FA(MethodView):
+    def get(self, username):
+        # Paso 1: Generar o reutilizar secreto
+        secret = generate_totp_secret_for_user(username)
+
+        # Paso 2: Crear URI OTP (estándar)
+        totp = pyotp.TOTP(secret)
+        otp_uri = totp.provisioning_uri(name=username, issuer_name="SYS BYTE")
+
+        # Paso 3: Generar QR como base64
+        img = qrcode.make(otp_uri, image_factory=PilImage)
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        return jsonify({
+            "username": username,
+            "secret": secret,
+            "otp_auth_url": otp_uri,
+            "qr_code": f"data:image/png;base64,{qr_base64}"
+        })
+
+@blp.route("/verify-2fa")
+class Verify2FA(MethodView):
+    def post(self):
+        data = request.get_json()
+        username = data.get("username")
+        otp_code = data.get("otp")
+
+        if not username:
+            return {"error": "Falta el username"}, 400
+
+        # 🚨 Caso especial: solo estamos verificando si ya requiere 2FA
+        if otp_code is None:
+            from utils.totp_manager import get_user_totp_secret
+            secret = get_user_totp_secret(username)
+            return {"requires_2fa": bool(secret)}, 200  # ✅ Siempre devuelve 200 OK
+
+
+        # ✅ Verificación normal
+        if verify_totp(username, otp_code):
+            return {"success": True}, 200
+        else:
+            return {"error": "Código inválido"}, 401
+

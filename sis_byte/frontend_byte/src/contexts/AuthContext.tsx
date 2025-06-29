@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.tsx
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import api from "../services/api";
@@ -47,29 +48,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async ({ username, password }: { username: string; password: string }) => {
-    await loginWithCredentials(username, password);
+  console.log("[Auth] Iniciando login con usuario:", username);
+  await loginWithCredentials(username, password);
 
-    const token = getToken();
-    const parsed = getUserInfo();
+  const token = getToken();
+  const parsed = getUserInfo();
 
-    if (!token || !parsed) throw new Error("No se pudo obtener el token");
+  if (!token || !parsed) {
+    console.error("[Auth] Token o datos de usuario no disponibles");
+    throw new Error("No se pudo obtener el token");
+  }
 
-    const usuario: Usuario = {
-      id_usuario: 0,
-      nombre: parsed.name || parsed.preferred_username || username,
-      email: parsed.email || `${username}@fake.local`,
-      rol: parsed.realm_access?.roles?.[0] || "usuario", // puedes personalizar esto
-    };
-
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(usuario));
-    api.defaults.headers.common.Authorization = `Bearer ${token}`;
-    setUser(usuario);
+  const usuario: Usuario = {
+    id_usuario: 0,
+    nombre: parsed.name || parsed.preferred_username || username,
+    email: parsed.email || `${username}@fake.local`,
+    rol: parsed.realm_access?.roles?.[0] || "usuario",
   };
+
+  console.log("[Auth] Usuario autenticado:", usuario);
+
+  localStorage.setItem("token", token);
+  localStorage.setItem("user", JSON.stringify(usuario));
+  api.defaults.headers.common.Authorization = `Bearer ${token}`;
+  setUser(usuario);
+
+  // Verificar si necesita 2FA
+  try {
+    const res = await api.post("/auth/verify-2fa", { username, otp: null });
+    const requiere2FA = res.data.requires_2fa;
+
+    console.log("[2FA] Resultado verificación inicial:", requiere2FA);
+
+    console.log("[2FA] Resultado verificación inicial:", requiere2FA);
+    if (requiere2FA) {
+      localStorage.removeItem("2fa_passed"); // opcional por limpieza
+    } else {
+      // aún no seteamos nada
+    }
+
+  } catch (err) {
+    console.error("[2FA] Error al verificar si requiere 2FA", err);
+  }
+};
+
+
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("2fa_passed");
+    localStorage.removeItem("pending_2fa_user");
     delete api.defaults.headers.common.Authorization;
     setUser(null);
     keycloakLogout();
