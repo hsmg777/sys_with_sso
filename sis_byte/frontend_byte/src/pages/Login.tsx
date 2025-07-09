@@ -105,6 +105,23 @@ export default function Login() {
             >
               Entrar
             </button>
+            <hr className="my-4" />
+            <button
+              type="button"
+              onClick={() => {
+                const clientId = "frontend-byte-client";
+                const redirectUri = encodeURIComponent("http://localhost:5173/login/callback");
+                const keycloakUrl = `http://localhost:8080/realms/MultiAppRealm/protocol/openid-connect/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid profile email&kc_idp_hint=google`;
+
+                window.location.href = keycloakUrl;
+              }}
+              className="w-full border border-gray-300 py-2 rounded-md hover:bg-gray-100 transition flex items-center justify-center gap-2"
+            >
+              <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
+              Iniciar sesión con Google
+            </button>
+
+
           </form>
         </div>
       </div>

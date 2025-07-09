@@ -26,3 +26,4 @@ Werkzeug==2.2.2
 requests
 pyotp==2.9.0
 qrcode==7.4.2
+pycryptodome==3.20.0

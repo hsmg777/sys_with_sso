@@ -24,6 +24,7 @@ import { CosechaRoute }       from "../components/CosechaRoute";
 import IngresoForm            from "../pages/IngresoForm";
 import IngresoList            from "../pages/IngresoList";
 import Ventas                 from "../pages/Ventas"; 
+import LoginCallback          from "../components/LoginCallback";
 
 
 
@@ -35,6 +36,8 @@ export default function AppRouter() {
         <Routes>
           {/* Públicas */}
           <Route path="/" element={<Login />} />
+          <Route path="/login/callback" element={<LoginCallback />} />
+
 
           {/* Cualquier usuario autenticado */}
           <Route path="/homepage" element={<AuthenticatedRoute />}>

@@ -16,6 +16,7 @@ from resources.presupuesto import blp as PresupuestoBlueprint
 from resources.stock import blp as StockBlueprint
 from resources.ingreso_stock import blp as IngresoStockBluePrint
 from resources.ventas import blp as VentasBluePrint
+from resources.trama_resource import trama_bp as TramaBlueprint
 
 
 
@@ -29,15 +30,9 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY']               = os.getenv("JWT_SECRET_KEY")
 
-    # CORS: permitimos origen desde tu frontend y explícitamente el header Authorization
-    # extensiva configuración CORS para /api/*
-    CORS(
-        app,
-        resources={r"/api/*": {"origins": "http://localhost:5173"}},
-        supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization"],
-        methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    )
+
+    CORS(app, origins="*", supports_credentials=True)
+
 
     app.config['API_TITLE']            = 'Sistema de Gestión'
     app.config['API_VERSION']          = 'v1'
@@ -77,6 +72,7 @@ def create_app():
     api.register_blueprint(StockBlueprint)
     api.register_blueprint(IngresoStockBluePrint)
     api.register_blueprint(VentasBluePrint)
+    api.register_blueprint(TramaBlueprint, url_prefix='/api/trama')
 
 
 

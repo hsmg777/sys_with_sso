@@ -146,4 +146,26 @@ class Verify2FA(MethodView):
             return {"success": True}, 200
         else:
             return {"error": "Código inválido"}, 401
+        
+@blp.route("/google-login", methods=["POST"])
+def google_login():
+    id_token = request.json.get('id_token')
 
+    if not id_token:
+        return jsonify({"error": "Falta el id_token"}), 400
+
+    response = requests.post(
+        'http://localhost:8080/realms/MultiAppRealm/protocol/openid-connect/token',
+        data={
+            'grant_type': 'urn:ietf:params:oauth:grant-type:token-exchange',
+            'subject_token': id_token,
+            'subject_issuer': 'google',
+            'client_id': 'frontend-byte-client'
+        },
+        headers={ 'Content-Type': 'application/x-www-form-urlencoded' }
+    )
+
+    if response.status_code != 200:
+        return jsonify({"error": "Fallo el token exchange", "detail": response.text}), 400
+
+    return jsonify(response.json())

@@ -2,14 +2,20 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [ react() ],
+  plugins: [react()],
   server: {
-    host: true,           // ya lo tenías
+    host: true,
     watch: {
-      // fuerza a usar polling para detectar cambios en Docker
       usePolling: true,
-      // cada cuánto mira (en ms), puedes dejarlo en 100
-      interval: 100
-    }
-  }
+      interval: 100,
+    },
+  },
+  optimizeDeps: {
+    include: ['crypto-js'], // 👈 fuerza a incluir crypto-js
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/], // 👈 permite módulos CJS
+    },
+  },
 })

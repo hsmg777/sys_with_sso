@@ -1,5 +1,11 @@
 'use client';
 
+import { useState } from 'react';
+// @ts-ignore
+import CryptoJS from 'crypto-js';
+
+const SECRET_KEY = 'clave-super-secreta-32bytes-!!!!'; 
+
 export default function LandingPageMock() {
   // Datos quemados
   const userData = {
@@ -21,6 +27,55 @@ export default function LandingPageMock() {
     ],
   };
 
+  const [mensaje, setMensaje] = useState('');
+  const [estado, setEstado] = useState('');
+
+  const IV = CryptoJS.enc.Utf8.parse('iv-para-encriptacion'); // 16 bytes
+
+  const encryptPayload = (data: any) => {
+    const key = CryptoJS.enc.Utf8.parse(SECRET_KEY);
+    const encrypted = CryptoJS.AES.encrypt(
+      JSON.stringify(data),
+      key,
+      {
+        iv: IV,
+        mode: CryptoJS.mode.CBC,
+        padding: CryptoJS.pad.Pkcs7,
+      }
+    );
+    return CryptoJS.enc.Base64.stringify(encrypted.ciphertext);
+  };
+
+  const handleEnviarTrama = async () => {
+    if (!mensaje) {
+      setEstado('❌ Escribe un mensaje antes de enviar');
+      return;
+    }
+
+    const tramaCifrada = encryptPayload({ mensaje });
+
+    try {
+      const res = await fetch('http://localhost:5000/api/trama/recibir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trama: tramaCifrada }),
+      });
+
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log('✅ Trama enviada:', data);
+        setEstado(`✅ Trama enviada correctamente: "${mensaje}"`);
+        setMensaje(''); // limpia input
+      } else {
+        setEstado('❌ Error al enviar la trama');
+      }
+    } catch (err) {
+      console.error('❌ Error al enviar la trama:', err);
+      setEstado('❌ Error al enviar la trama');
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-4xl">
@@ -28,6 +83,7 @@ export default function LandingPageMock() {
           ¡Bienvenido, {userData.nombres} {userData.apellidos}!
         </h1>
 
+        {/* Sección de información */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Tu Información Personal:</h2>
           <ul className="list-disc pl-6 text-gray-600 space-y-2">
@@ -39,28 +95,28 @@ export default function LandingPageMock() {
           </ul>
         </div>
 
+        {/* NUEVO: Enviar Trama */}
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Tus Macronutrientes Recomendados:</h2>
-          <ul className="list-disc pl-6 text-gray-600 space-y-2">
-            <li><b>Proteínas:</b> {userData.macronutrientes.proteinas} g</li>
-            <li><b>Carbohidratos:</b> {userData.macronutrientes.carbohidratos} g</li>
-            <li><b>Grasas:</b> {userData.macronutrientes.grasas} g</li>
-          </ul>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Preferencias Alimentarias:</h2>
-          {userData.preferencias_alimentarias.length > 0 ? (
-            <ul className="list-disc pl-6 text-gray-600 space-y-2">
-              {userData.preferencias_alimentarias.map((pref) => (
-                <li key={pref.id}>{pref.nombre}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-500">No tienes preferencias alimentarias seleccionadas.</p>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Enviar Trama a SYS BYTE:</h2>
+          <input
+            type="text"
+            placeholder="Escribe un mensaje"
+            value={mensaje}
+            onChange={(e) => setMensaje(e.target.value)}
+            className="w-full p-2 border rounded mb-2"
+          />
+          <button
+            onClick={handleEnviarTrama}
+            className="w-full px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+          >
+            Enviar Trama
+          </button>
+          {estado && (
+            <p className="mt-2 text-sm text-gray-600">{estado}</p>
           )}
         </div>
 
+        {/* Botones anteriores */}
         <div className="flex flex-col gap-4">
           <button
             className="w-full px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none"

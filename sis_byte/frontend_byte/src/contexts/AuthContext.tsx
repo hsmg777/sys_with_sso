@@ -27,6 +27,7 @@ interface AuthContextType {
   user: Usuario | null;
   ready: boolean;
   login: (data: { username: string; password: string }) => Promise<void>;
+  loginWithToken: (token: string) => Promise<void>; 
   logout: () => void;
   register: (data: RegisterData) => Promise<void>;
 }
@@ -94,6 +95,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
 
+
+const loginWithToken = async (token: string) => {
+  localStorage.setItem("token", token);
+  api.defaults.headers.common.Authorization = `Bearer ${token}`;
+
+  const parsed = getUserInfo(); // usa el token de localStorage
+
+  if (!parsed) {
+    throw new Error("No se pudo extraer la información del usuario");
+  }
+
+  const usuario: Usuario = {
+    id_usuario: 0,
+    nombre: parsed.name || parsed.preferred_username || "usuario",
+    email: parsed.email || "correo@fake.com",
+    rol: parsed.realm_access?.roles?.[0] || "usuario",
+  };
+
+  localStorage.setItem("user", JSON.stringify(usuario));
+  setUser(usuario);
+};
+
+
+
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -109,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, ready, login, logout, register }}>
+    <AuthContext.Provider value={{ user, ready, login, loginWithToken, logout, register }}>
       {children}
     </AuthContext.Provider>
   );
