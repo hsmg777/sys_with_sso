@@ -8,6 +8,7 @@ import os
 import pyotp
 import base64
 from qrcode.image.pil import PilImage
+import qrcode.image.svg 
 
 
 
@@ -101,28 +102,34 @@ from utils.totp_manager import (
 from flask import jsonify
 from io import BytesIO
 
+
 @blp.route("/setup-2fa/<username>")
 class Setup2FA(MethodView):
     def get(self, username):
-        # Paso 1: Generar o reutilizar secreto
-        secret = generate_totp_secret_for_user(username)
+        try:
+            # Paso 1: Generar o reutilizar secreto
+            secret = generate_totp_secret_for_user(username)
 
-        # Paso 2: Crear URI OTP (estándar)
-        totp = pyotp.TOTP(secret)
-        otp_uri = totp.provisioning_uri(name=username, issuer_name="SYS BYTE")
+            # Paso 2: Crear URI OTP (estándar)
+            totp = pyotp.TOTP(secret)
+            otp_uri = totp.provisioning_uri(name=username, issuer_name="SYS BYTE")
 
-        # Paso 3: Generar QR como base64
-        img = qrcode.make(otp_uri, image_factory=PilImage)
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            # Paso 3: Generar QR como SVG (no requiere Pillow)
+            factory = qrcode.image.svg.SvgImage
+            qr = qrcode.make(otp_uri, image_factory=factory)
 
-        return jsonify({
-            "username": username,
-            "secret": secret,
-            "otp_auth_url": otp_uri,
-            "qr_code": f"data:image/png;base64,{qr_base64}"
-        })
+            buffer = BytesIO()
+            qr.save(buffer)
+            svg_data = buffer.getvalue().decode("utf-8")
+
+            return jsonify({
+                "username": username,
+                "secret": secret,
+                "otp_auth_url": otp_uri,
+                "qr_code": f"data:image/svg+xml;utf8,{svg_data}"
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
 @blp.route("/verify-2fa")
 class Verify2FA(MethodView):

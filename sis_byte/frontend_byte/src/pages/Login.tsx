@@ -117,8 +117,8 @@ export default function Login() {
               }}
               className="w-full border border-gray-300 py-2 rounded-md hover:bg-gray-100 transition flex items-center justify-center gap-2"
             >
-              <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
-              Iniciar sesión con Google
+              <img src="/google-login.png" alt="Google" className="w-5 h-5" />
+               Iniciar sesión con Google
             </button>
 
 
